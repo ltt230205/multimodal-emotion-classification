@@ -116,48 +116,22 @@ df.head()
 
 
 # %% [markdown]
-# ## 7. Chọn cột image, text và label
+# ## 7. Ki?m tra c?c c?t c?n d?ng
 #
-# Memotion có thể đặt tên cột hơi khác giữa các bản. Cell này tự đoán cột.
-# Nếu tự đoán sai, bạn sửa 3 biến:
+# V? ta ?? bi?t c?u tr?c `labels.csv`, code d?ng th?ng 3 c?t:
 #
-# ```python
-# image_col = "ten_cot_anh"
-# text_col = "ten_cot_text"
-# label_col = "ten_cot_label"
-# ```
+# - `image_name`: t?n file ?nh
+# - `text_ocr`: text/OCR ??a v?o BERT
+# - `overall_sentiment`: nh?n sentiment
 
 # %%
-def choose_column(columns, keywords):
-    for key in keywords:
-        for col in columns:
-            if key.lower() in str(col).lower():
-                return col
-    return None
+required_columns = ["image_name", "text_ocr", "overall_sentiment"]
 
+for col in required_columns:
+    if col not in df.columns:
+        raise ValueError(f"Kh?ng t?m th?y c?t b?t bu?c: {col}")
 
-image_col = choose_column(
-    df.columns,
-    ["image_name", "image", "file_name", "filename", "img"],
-)
-
-text_col = choose_column(
-    df.columns,
-    ["ocr_text", "ocr", "text", "caption", "sentence"],
-)
-
-label_col = choose_column(
-    df.columns,
-    ["overall_sentiment", "sentiment", "label", "class"],
-)
-
-print("image_col:", image_col)
-print("text_col :", text_col)
-print("label_col:", label_col)
-
-if image_col is None or text_col is None or label_col is None:
-    raise ValueError("Không tự đoán được đủ cột. Hãy sửa image_col, text_col, label_col thủ công.")
-
+print("C?c c?t c?n d?ng ??u t?n t?i:", required_columns)
 
 # %% [markdown]
 # ## 8. Tìm đường dẫn ảnh thật
@@ -263,9 +237,9 @@ def normalize_sentiment(label):
 
 # %%
 data = pd.DataFrame()
-data["text"] = df[text_col].fillna("").astype(str)
-data["image_path"] = df[image_col].apply(get_image_path)
-data["label_name"] = df[label_col].apply(normalize_sentiment)
+data["text"] = df["text_ocr"].fillna("").astype(str)
+data["image_path"] = df["image_name"].apply(get_image_path)
+data["label_name"] = df["overall_sentiment"].apply(normalize_sentiment)
 
 print("Trước khi bỏ mẫu lỗi:", len(data))
 

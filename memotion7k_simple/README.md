@@ -215,29 +215,25 @@ df = pd.read_csv(metadata_path)
 
 N?u Kaggle c?a b?n ??t dataset ? ???ng d?n kh?c, ch? c?n s?a tr?c ti?p chu?i path trong `metadata_path`.
 
-### 5.3. Chọn cột image, text và label
+### 5.3. D?ng th?ng c?c c?t trong `labels.csv`
 
-Code tự đoán:
+V? ta ?? bi?t `labels.csv` c? c?c c?t c?n d?ng, notebook kh?ng c?n t? ?o?n c?t n?a.
 
-```python
-image_col
-text_col
-label_col
-```
-
-Nếu tự đoán sai, sửa thủ công:
+C?c c?t ???c d?ng tr?c ti?p:
 
 ```python
-image_col = "ten_cot_anh"
-text_col = "ten_cot_text"
-label_col = "ten_cot_label"
+required_columns = ["image_name", "text_ocr", "overall_sentiment"]
 ```
 
-Bạn xem danh sách cột bằng output:
+Khi t?o dataframe s?ch, code tr? th?ng v?o c?t:
 
 ```python
-print(list(df.columns))
+data["text"] = df["text_ocr"].fillna("").astype(str)
+data["image_path"] = df["image_name"].apply(get_image_path)
+data["label_name"] = df["overall_sentiment"].apply(normalize_sentiment)
 ```
+
+Nh? v?y code ng?n h?n v? d? hi?u h?n ?o?n `choose_column(...)`.
 
 ### 5.4. Chuẩn hóa label
 
