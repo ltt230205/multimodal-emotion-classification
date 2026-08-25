@@ -6,17 +6,22 @@ Thư mục này chứa một bài code Kaggle đơn giản cho bài toán phân 
 Memotion Dataset 7k
 ```
 
-File code chính:
+File notebook chính để chạy trên Kaggle:
+
+```text
+kaggle_memotion7k_simple_multimodal.ipynb
+```
+
+File code script cùng nội dung, dùng để đọc/sửa bằng VS Code:
 
 ```text
 kaggle_memotion7k_simple_multimodal.py
 ```
 
-Code được viết theo kiểu Jupyter/Kaggle notebook script, có các cell `# %%`, nên bạn có thể:
+Bạn nên dùng file `.ipynb` khi chạy trên Kaggle vì đây là định dạng Notebook chuẩn. File `.py` chỉ là bản script có cùng nội dung để dễ quản lý code trong Git.
 
-- mở bằng VS Code rồi chạy từng cell
-- copy toàn bộ sang Kaggle Notebook
-- hoặc upload file `.py` lên Kaggle
+- upload file `.ipynb` lên Kaggle rồi chạy từng cell
+- mở file `.py` bằng VS Code nếu muốn đọc hoặc chỉnh code dạng script
 
 ## 1. Mục tiêu bài toán
 
@@ -65,7 +70,14 @@ https://www.kaggle.com/datasets/williamscott701/memotion-dataset-7k
 
 ### Bước 1: Tạo Kaggle Notebook
 
-Vào Kaggle, tạo Notebook mới.
+Bạn có hai cách:
+
+```text
+Cách 1: Upload file kaggle_memotion7k_simple_multimodal.ipynb lên Kaggle
+Cách 2: Tạo Notebook mới rồi copy từng cell từ file ipynb
+```
+
+Cách nên dùng là upload trực tiếp file `.ipynb`.
 
 Nên bật GPU:
 
