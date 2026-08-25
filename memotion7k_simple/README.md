@@ -199,21 +199,21 @@ for epoch in range(3):
 
 N?u mu?n ch?nh tham s?, b?n s?a tr?c ti?p ? d?ng ?ang d?ng gi? tr? ??.
 
-### 5.2. Đọc metadata
+### 5.2. ??c metadata
 
-Dataset có file metadata chứa tên ảnh, text và label. Code tìm các file:
+Notebook ??c th?ng file `labels.csv`, kh?ng d?ng thu?t to?n t? ch?n metadata n?a.
 
-```python
-.csv, .xlsx, .xls
-```
-
-rồi chọn file có vẻ phù hợp nhất.
-
-Nếu code chọn sai metadata, bạn sửa:
+???ng d?n ?ang d?ng trong code:
 
 ```python
-metadata_path = Path("duong_dan_file_metadata")
+metadata_path = Path(
+    "/kaggle/input/datasets/williamscott701/memotion-dataset-7k/"
+    "memotion_dataset_7k/labels.csv"
+)
+df = pd.read_csv(metadata_path)
 ```
+
+N?u Kaggle c?a b?n ??t dataset ? ???ng d?n kh?c, ch? c?n s?a tr?c ti?p chu?i path trong `metadata_path`.
 
 ### 5.3. Chọn cột image, text và label
 

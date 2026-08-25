@@ -92,33 +92,23 @@ if len(table_files) == 0:
 # %% [markdown]
 # ## 6. Đọc metadata
 #
-# Code tự chọn file đầu tiên có vẻ phù hợp. Nếu chọn sai, bạn có thể sửa `metadata_path`.
+
 
 # %%
-# Ưu tiên file có chữ "label", "train" hoặc "annotation" trong tên.
-best_score = -999
-metadata_path = table_files[0]
 
-for path in table_files:
-    name = path.name.lower()
-    score = 0
-    if "label" in name:
-        score += 3
-    if "train" in name:
-        score += 2
-    if "annotation" in name:
-        score += 2
-    if score > best_score:
-        best_score = score
-        metadata_path = path
+# ??c th?ng file labels.csv.
+# N?u Kaggle c?a b?n c? ???ng d?n kh?c, s?a tr?c ti?p path b?n d??i.
+metadata_path = Path(
+    "/kaggle/input/datasets/williamscott701/memotion-dataset-7k/"
+    "memotion_dataset_7k/labels.csv"
+)
 
-print("Metadata được chọn:", metadata_path)
+if not metadata_path.exists():
+    raise FileNotFoundError(f"Kh?ng t?m th?y metadata: {metadata_path}")
 
-if metadata_path.suffix.lower() == ".csv":
-    df = pd.read_csv(metadata_path)
-else:
-    df = pd.read_excel(metadata_path)
+df = pd.read_csv(metadata_path)
 
+print("Metadata ?ang d?ng:", metadata_path)
 print("Shape:", df.shape)
 print("Columns:")
 print(list(df.columns))
