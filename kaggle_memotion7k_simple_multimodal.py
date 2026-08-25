@@ -60,29 +60,27 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 # rồi sửa lại `DATA_ROOT` cho đúng.
 
 # %%
-class CFG:
-    seed = 42
+SEED = 42
 
-    # Đường dẫn mặc định khi Add Input dataset trên Kaggle.
-    # Nếu Kaggle của bạn để dataset trong /kaggle/input/datasets/..., hãy sửa lại dòng này.
-    DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
+# ???ng d?n m?c ??nh khi Add Input dataset tr?n Kaggle.
+# N?u Kaggle c?a b?n ?? dataset trong /kaggle/input/datasets/..., h?y s?a l?i d?ng n?y.
+DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
 
-    # Model text rất nhỏ. "prajjwal1/bert-tiny" là một BERT nhỏ, nhẹ,
-    # phù hợp khi bạn muốn gọi là BERT nano/tiny trong bài demo.
-    # Nếu muốn dùng BERT chuẩn, đổi thành: "bert-base-uncased"
-    TEXT_MODEL = "prajjwal1/bert-tiny"
+# Model text r?t nh?. "prajjwal1/bert-tiny" l? m?t BERT nh?, nh?,
+# ph? h?p khi b?n mu?n g?i l? BERT nano/tiny trong b?i demo.
+# N?u mu?n d?ng BERT chu?n, ??i th?nh: "bert-base-uncased"
+TEXT_MODEL = "prajjwal1/bert-tiny"
 
-    max_len = 96
-    image_size = 224
-    batch_size = 16
-    epochs = 3
-    lr = 2e-5
-    num_workers = 2
+MAX_LEN = 96
+IMAGE_SIZE = 224
+BATCH_SIZE = 16
+EPOCHS = 3
+LEARNING_RATE = 2e-5
+NUM_WORKERS = 2
 
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-print("Device:", CFG.device)
+print("Device:", DEVICE)
 
 
 # %% [markdown]
@@ -99,7 +97,7 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-seed_everything(CFG.seed)
+seed_everything(SEED)
 
 
 # %% [markdown]
@@ -112,8 +110,8 @@ if Path("/kaggle/input").exists():
 else:
     print("Không chạy trên Kaggle hoặc chưa có /kaggle/input")
 
-print("\nDATA_ROOT hiện tại:", CFG.DATA_ROOT)
-print("DATA_ROOT tồn tại không?", CFG.DATA_ROOT.exists())
+print("\nDATA_ROOT hiện tại:", DATA_ROOT)
+print("DATA_ROOT tồn tại không?", DATA_ROOT.exists())
 
 
 # %% [markdown]
@@ -136,7 +134,7 @@ def find_table_files(root):
     return table_files
 
 
-table_files = find_table_files(CFG.DATA_ROOT)
+table_files = find_table_files(DATA_ROOT)
 
 print("Các file metadata tìm thấy:")
 for i, path in enumerate(table_files):
@@ -245,7 +243,7 @@ if image_col is None or text_col is None or label_col is None:
 image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".webp"]
 
 all_image_paths = []
-for path in CFG.DATA_ROOT.rglob("*"):
+for path in DATA_ROOT.rglob("*"):
     if path.suffix.lower() in image_extensions:
         all_image_paths.append(path)
 
@@ -399,7 +397,7 @@ data.head()
 train_df, val_df = train_test_split(
     data,
     test_size=0.2,
-    random_state=CFG.seed,
+    random_state=SEED,
     stratify=data["label"],
 )
 
@@ -421,11 +419,11 @@ print(val_df["label_name"].value_counts())
 # Image được resize 224x224 và normalize theo ImageNet để hợp với ResNet pretrained.
 
 # %%
-tokenizer = AutoTokenizer.from_pretrained(CFG.TEXT_MODEL)
+tokenizer = AutoTokenizer.from_pretrained(TEXT_MODEL)
 
 train_image_transform = transforms.Compose(
     [
-        transforms.Resize((CFG.image_size, CFG.image_size)),
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.RandomHorizontalFlip(p=0.3),
         transforms.ToTensor(),
         transforms.Normalize(
@@ -437,7 +435,7 @@ train_image_transform = transforms.Compose(
 
 val_image_transform = transforms.Compose(
     [
-        transforms.Resize((CFG.image_size, CFG.image_size)),
+        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -460,11 +458,12 @@ val_image_transform = transforms.Compose(
 
 # %%
 class MemotionDataset(Dataset):
-    def __init__(self, dataframe, tokenizer, image_transform, max_len):
+    def __init__(self, dataframe, tokenizer, image_transform, max_len, image_size):
         self.dataframe = dataframe
         self.tokenizer = tokenizer
         self.image_transform = image_transform
         self.max_len = max_len
+        self.image_size = image_size
 
     def __len__(self):
         return len(self.dataframe)
@@ -490,7 +489,7 @@ class MemotionDataset(Dataset):
         try:
             image = Image.open(image_path).convert("RGB")
         except Exception:
-            image = Image.new("RGB", (CFG.image_size, CFG.image_size), color=(0, 0, 0))
+            image = Image.new("RGB", (self.image_size, self.image_size), color=(0, 0, 0))
 
         image = self.image_transform(image)
 
@@ -510,28 +509,30 @@ train_dataset = MemotionDataset(
     dataframe=train_df,
     tokenizer=tokenizer,
     image_transform=train_image_transform,
-    max_len=CFG.max_len,
+    max_len=MAX_LEN,
+    image_size=IMAGE_SIZE,
 )
 
 val_dataset = MemotionDataset(
     dataframe=val_df,
     tokenizer=tokenizer,
     image_transform=val_image_transform,
-    max_len=CFG.max_len,
+    max_len=MAX_LEN,
+    image_size=IMAGE_SIZE,
 )
 
 train_loader = DataLoader(
     train_dataset,
-    batch_size=CFG.batch_size,
+    batch_size=BATCH_SIZE,
     shuffle=True,
-    num_workers=CFG.num_workers,
+    num_workers=NUM_WORKERS,
 )
 
 val_loader = DataLoader(
     val_dataset,
-    batch_size=CFG.batch_size,
+    batch_size=BATCH_SIZE,
     shuffle=False,
-    num_workers=CFG.num_workers,
+    num_workers=NUM_WORKERS,
 )
 
 print("Số batch train:", len(train_loader))
@@ -662,11 +663,11 @@ class SimpleMultimodalModel(nn.Module):
 
 
 model = SimpleMultimodalModel(
-    text_model_name=CFG.TEXT_MODEL,
+    text_model_name=TEXT_MODEL,
     num_classes=3,
 )
 
-model = model.to(CFG.device)
+model = model.to(DEVICE)
 
 print(model)
 
@@ -679,7 +680,7 @@ criterion = nn.CrossEntropyLoss()
 
 optimizer = torch.optim.AdamW(
     model.parameters(),
-    lr=CFG.lr,
+    lr=LEARNING_RATE,
 )
 
 
@@ -770,23 +771,23 @@ def evaluate(model, dataloader, criterion, device):
 best_val_f1 = 0
 history = []
 
-for epoch in range(CFG.epochs):
+for epoch in range(EPOCHS):
     print("=" * 60)
-    print(f"Epoch {epoch + 1}/{CFG.epochs}")
+    print(f"Epoch {epoch + 1}/{EPOCHS}")
 
     train_loss, train_acc, train_f1 = train_one_epoch(
         model=model,
         dataloader=train_loader,
         criterion=criterion,
         optimizer=optimizer,
-        device=CFG.device,
+        device=DEVICE,
     )
 
     val_loss, val_acc, val_f1, val_preds, val_labels = evaluate(
         model=model,
         dataloader=val_loader,
         criterion=criterion,
-        device=CFG.device,
+        device=DEVICE,
     )
 
     print(f"Train loss: {train_loss:.4f} | Train acc: {train_acc:.4f} | Train F1: {train_f1:.4f}")
@@ -818,13 +819,13 @@ history_df
 # ## 22. Kết quả cuối cùng
 
 # %%
-model.load_state_dict(torch.load("best_simple_memotion_model.pt", map_location=CFG.device))
+model.load_state_dict(torch.load("best_simple_memotion_model.pt", map_location=DEVICE))
 
 val_loss, val_acc, val_f1, val_preds, val_labels = evaluate(
     model=model,
     dataloader=val_loader,
     criterion=criterion,
-    device=CFG.device,
+    device=DEVICE,
 )
 
 print("Best validation accuracy:", val_acc)
@@ -842,12 +843,12 @@ print(confusion_matrix(val_labels, val_preds))
 # ## 23. Inference thử một mẫu
 
 # %%
-def predict_one_sample(text, image_path):
+def predict_one_sample(text, image_path, max_len, image_size, device):
     model.eval()
 
     encoded_text = tokenizer(
         text,
-        max_length=CFG.max_len,
+        max_length=max_len,
         padding="max_length",
         truncation=True,
         return_tensors="pt",
@@ -856,13 +857,13 @@ def predict_one_sample(text, image_path):
     try:
         image = Image.open(image_path).convert("RGB")
     except Exception:
-        image = Image.new("RGB", (CFG.image_size, CFG.image_size), color=(0, 0, 0))
+        image = Image.new("RGB", (image_size, image_size), color=(0, 0, 0))
 
     image = val_image_transform(image).unsqueeze(0)
 
-    input_ids = encoded_text["input_ids"].to(CFG.device)
-    attention_mask = encoded_text["attention_mask"].to(CFG.device)
-    image = image.to(CFG.device)
+    input_ids = encoded_text["input_ids"].to(device)
+    attention_mask = encoded_text["attention_mask"].to(device)
+    image = image.to(device)
 
     with torch.no_grad():
         logits = model(
@@ -890,7 +891,13 @@ print("True label:", sample["label_name"])
 print("Image path:", sample["image_path"])
 print()
 
-predict_one_sample(sample["text"], sample["image_path"])
+predict_one_sample(
+    text=sample["text"],
+    image_path=sample["image_path"],
+    max_len=MAX_LEN,
+    image_size=IMAGE_SIZE,
+    device=DEVICE,
+)
 
 
 # %% [markdown]
@@ -898,7 +905,7 @@ predict_one_sample(sample["text"], sample["image_path"])
 #
 # ### Dùng BERT chuẩn thay BERT nano/tiny
 #
-# Sửa trong `CFG`:
+# Sửa ? ph?n tham s? ??u notebook:
 #
 # ```python
 # TEXT_MODEL = "bert-base-uncased"
@@ -906,7 +913,7 @@ predict_one_sample(sample["text"], sample["image_path"])
 #
 # ### Dùng DistilBERT thay BERT nano/tiny
 #
-# Sửa trong `CFG`:
+# Sửa ? ph?n tham s? ??u notebook:
 #
 # ```python
 # TEXT_MODEL = "distilbert-base-uncased"
@@ -936,13 +943,13 @@ predict_one_sample(sample["text"], sample["image_path"])
 # Giảm:
 #
 # ```python
-# batch_size = 8
+# BATCH_SIZE = 8
 # ```
 #
 # hoặc:
 #
 # ```python
-# batch_size = 4
+# BATCH_SIZE = 4
 # ```
 #
 # ### Nếu DataLoader bị lỗi
@@ -950,7 +957,7 @@ predict_one_sample(sample["text"], sample["image_path"])
 # Sửa:
 #
 # ```python
-# num_workers = 0
+# NUM_WORKERS = 0
 # ```
 #
 # ### Nếu muốn train lâu hơn
@@ -958,13 +965,13 @@ predict_one_sample(sample["text"], sample["image_path"])
 # Tăng:
 #
 # ```python
-# epochs = 5
+# EPOCHS = 5
 # ```
 #
 # hoặc:
 #
 # ```python
-# epochs = 8
+# EPOCHS = 8
 # ```
 
 # %% [markdown]

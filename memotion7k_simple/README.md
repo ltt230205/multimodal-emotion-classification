@@ -185,17 +185,18 @@ Code được chia thành nhiều phần rõ ràng:
 
 ### 5.1. Config
 
-Phần này chứa các tham số chính:
+Phần này chứa các tham số chính. Bản notebook mới không dùng `class CFG`, mà khai báo biến trực tiếp để dễ nhìn và dễ sửa:
 
 ```python
-class CFG:
-    DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
-    TEXT_MODEL = "prajjwal1/bert-tiny"
-    max_len = 96
-    image_size = 224
-    batch_size = 16
-    epochs = 3
-    lr = 2e-5
+DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
+TEXT_MODEL = "prajjwal1/bert-tiny"
+MAX_LEN = 96
+IMAGE_SIZE = 224
+BATCH_SIZE = 16
+EPOCHS = 3
+LEARNING_RATE = 2e-5
+NUM_WORKERS = 2
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 ```
 
 Bạn thường chỉnh các tham số này:
@@ -204,9 +205,10 @@ Bạn thường chỉnh các tham số này:
 |---|---|---|
 | `DATA_ROOT` | đường dẫn dataset Kaggle | khi Kaggle đặt folder khác |
 | `TEXT_MODEL` | model xử lý text | muốn dùng BERT chuẩn hoặc DistilBERT |
-| `batch_size` | số mẫu mỗi batch | lỗi CUDA memory thì giảm |
-| `epochs` | số vòng train | muốn train lâu hơn |
-| `lr` | learning rate | model học quá chậm/quá bất ổn |
+| `BATCH_SIZE` | số mẫu mỗi batch | lỗi CUDA memory thì giảm |
+| `EPOCHS` | số vòng train | muốn train lâu hơn |
+| `LEARNING_RATE` | learning rate | model học quá chậm/quá bất ổn |
+| `NUM_WORKERS` | số worker load data | lỗi DataLoader thì đặt 0 |
 
 ### 5.2. Đọc metadata
 
@@ -477,13 +479,13 @@ DATA_ROOT = Path("duong_dan_dung")
 Giảm batch size:
 
 ```python
-batch_size = 8
+BATCH_SIZE = 8
 ```
 
 hoặc:
 
 ```python
-batch_size = 4
+BATCH_SIZE = 4
 ```
 
 ### Lỗi DataLoader hoặc ảnh hỏng
@@ -491,7 +493,7 @@ batch_size = 4
 Đổi:
 
 ```python
-num_workers = 0
+NUM_WORKERS = 0
 ```
 
 Code đã có xử lý ảnh lỗi:
@@ -507,7 +509,7 @@ và fallback ảnh đen nếu ảnh không đọc được.
 Giảm:
 
 ```python
-epochs = 2
+EPOCHS = 2
 ```
 
 hoặc giữ ResNet18 thay vì đổi sang ResNet50.
@@ -553,13 +555,13 @@ image_feature_size = 2048
 Sửa:
 
 ```python
-epochs = 5
+EPOCHS = 5
 ```
 
 hoặc:
 
 ```python
-epochs = 8
+EPOCHS = 8
 ```
 
 ### Tăng độ dài text
@@ -567,7 +569,7 @@ epochs = 8
 Nếu text dài, sửa:
 
 ```python
-max_len = 128
+MAX_LEN = 128
 ```
 
 ## 9. Đoạn mô tả cho báo cáo
