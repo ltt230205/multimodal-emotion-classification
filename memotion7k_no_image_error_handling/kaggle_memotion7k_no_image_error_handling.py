@@ -52,8 +52,8 @@ if Path("/kaggle/input").exists():
 else:
     print("Không chạy trên Kaggle hoặc chưa có /kaggle/input")
 
-print("\nDataset path:", Path("/kaggle/input/memotion-dataset-7k"))
-print("Dataset path exists:", Path("/kaggle/input/memotion-dataset-7k").exists())
+print("\nDataset path:", Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k"))
+print("Dataset path exists:", Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k").exists())
 
 
 # %% [markdown]
@@ -76,7 +76,7 @@ def find_table_files(root):
     return table_files
 
 
-table_files = find_table_files(Path("/kaggle/input/memotion-dataset-7k"))
+table_files = find_table_files(Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k"))
 
 print("Các file metadata tìm thấy:")
 for i, path in enumerate(table_files):
@@ -141,14 +141,14 @@ print("Các cột cần dùng đều tồn tại:", required_columns)
 # Ta cần tìm đường dẫn đầy đủ trong Kaggle, ví dụ:
 #
 # ```text
-# /kaggle/input/memotion-dataset-7k/images/image_1.jpg
+# /kaggle/input/datasets/williamscott701/memotion-dataset-7k/.../image_1.jpg
 # ```
 
 # %%
 image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".webp"]
 
 all_image_paths = []
-for path in Path("/kaggle/input/memotion-dataset-7k").rglob("*"):
+for path in Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k").rglob("*"):
     if path.suffix.lower() in image_extensions:
         all_image_paths.append(path)
 
@@ -238,6 +238,8 @@ data["image_path"] = df["image_name"].apply(get_image_path)
 data["label_name"] = df["overall_sentiment"].apply(normalize_sentiment)
 
 print("Trước khi bỏ mẫu lỗi:", len(data))
+print("Số mẫu tìm được ảnh:", data["image_path"].notna().sum())
+print("Số mẫu có label hợp lệ:", data["label_name"].notna().sum())
 
 # Bỏ mẫu thiếu ảnh hoặc thiếu label.
 data = data.dropna(subset=["image_path", "label_name"]).reset_index(drop=True)

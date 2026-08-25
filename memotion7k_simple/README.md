@@ -142,7 +142,7 @@ chạy tiếp:
 print(os.listdir("/kaggle/input/datasets/williamscott701"))
 ```
 
-Sau đó sửa trực tiếp các dòng có `Path("/kaggle/input/memotion-dataset-7k")` cho đúng.
+Sau đó sửa trực tiếp các dòng có `Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k")` cho đúng.
 
 Ví dụ:
 
@@ -190,7 +190,7 @@ Bản notebook này không có cell khai báo tham số riêng; các giá trị 
 Ví dụ:
 
 ```python
-table_files = find_table_files(Path("/kaggle/input/memotion-dataset-7k"))
+table_files = find_table_files(Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k"))
 tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
 transforms.Resize((224, 224))
 DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
