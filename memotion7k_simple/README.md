@@ -142,7 +142,7 @@ chạy tiếp:
 print(os.listdir("/kaggle/input/datasets/williamscott701"))
 ```
 
-Sau ?? s?a tr?c ti?p c?c d?ng c? `Path("/kaggle/input/memotion-dataset-7k")` cho ??ng.
+Sau đó sửa trực tiếp các dòng có `Path("/kaggle/input/memotion-dataset-7k")` cho đúng.
 
 Ví dụ:
 
@@ -156,7 +156,7 @@ Code được chia thành nhiều phần rõ ràng:
 
 ```text
 1. Import thư viện
-2. Ki?m tra ???ng d?n dataset
+2. Kiểm tra đường dẫn dataset
 3. Cố định seed
 4. Kiểm tra dataset
 5. Tìm metadata
@@ -183,11 +183,11 @@ Code được chia thành nhiều phần rõ ràng:
 
 ## 5. Giải thích các phần quan trọng
 
-### 5.1. Tham s? ???c fix tr?c ti?p trong code
+### 5.1. Tham số được fix trực tiếp trong code
 
-B?n notebook n?y kh?ng c? cell khai b?o tham s? ri?ng; c?c gi? tr? ???c fix tr?c ti?p t?i n?i s? d?ng.
+Bản notebook này không có cell khai báo tham số riêng; các giá trị được fix trực tiếp tại nơi sử dụng.
 
-C?c gi? tr? ???c vi?t th?ng t?i n?i s? d?ng ?? code d? theo d?i h?n. V? d?:
+Ví dụ:
 
 ```python
 table_files = find_table_files(Path("/kaggle/input/memotion-dataset-7k"))
@@ -197,13 +197,13 @@ DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
 for epoch in range(3):
 ```
 
-N?u mu?n ch?nh tham s?, b?n s?a tr?c ti?p ? d?ng ?ang d?ng gi? tr? ??.
+Nếu muốn chỉnh tham số, bạn sửa trực tiếp ở dòng đang dùng giá trị đó.
 
-### 5.2. ??c metadata
+### 5.2. Đọc metadata
 
-Notebook ??c th?ng file `labels.csv`, kh?ng d?ng thu?t to?n t? ch?n metadata n?a.
+Notebook đọc thẳng file `labels.csv`, không dùng thuật toán tự chọn metadata nữa.
 
-???ng d?n ?ang d?ng trong code:
+Đường dẫn đang dùng trong code:
 
 ```python
 metadata_path = Path(
@@ -213,27 +213,25 @@ metadata_path = Path(
 df = pd.read_csv(metadata_path)
 ```
 
-N?u Kaggle c?a b?n ??t dataset ? ???ng d?n kh?c, ch? c?n s?a tr?c ti?p chu?i path trong `metadata_path`.
+Nếu Kaggle của bạn đặt dataset ở đường dẫn khác, chỉ cần sửa trực tiếp chuỗi path trong `metadata_path`.
 
-### 5.3. D?ng th?ng c?c c?t trong `labels.csv`
+### 5.3. Dùng thẳng các cột trong `labels.csv`
 
-V? ta ?? bi?t `labels.csv` c? c?c c?t c?n d?ng, notebook kh?ng c?n t? ?o?n c?t n?a.
+Vì ta đã biết `labels.csv` có các cột cần dùng, notebook không cần tự đoán cột nữa.
 
-C?c c?t ???c d?ng tr?c ti?p:
+Các cột được dùng trực tiếp:
 
 ```python
 required_columns = ["image_name", "text_ocr", "overall_sentiment"]
 ```
 
-Khi t?o dataframe s?ch, code tr? th?ng v?o c?t:
+Khi tạo dataframe sạch, code trỏ thẳng vào cột:
 
 ```python
 data["text"] = df["text_ocr"].fillna("").astype(str)
 data["image_path"] = df["image_name"].apply(get_image_path)
 data["label_name"] = df["overall_sentiment"].apply(normalize_sentiment)
 ```
-
-Nh? v?y code ng?n h?n v? d? hi?u h?n ?o?n `choose_column(...)`.
 
 ### 5.4. Chuẩn hóa label
 

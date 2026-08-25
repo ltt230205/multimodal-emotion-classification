@@ -92,23 +92,22 @@ if len(table_files) == 0:
 # %% [markdown]
 # ## 6. Đọc metadata
 #
-
+# Code đọc thẳng file `labels.csv`, không cần tự chọn metadata.
 
 # %%
-
-# ??c th?ng file labels.csv.
-# N?u Kaggle c?a b?n c? ???ng d?n kh?c, s?a tr?c ti?p path b?n d??i.
+# Đọc thẳng file labels.csv.
+# Nếu Kaggle của bạn có đường dẫn khác, sửa trực tiếp path bên dưới.
 metadata_path = Path(
     "/kaggle/input/datasets/williamscott701/memotion-dataset-7k/"
     "memotion_dataset_7k/labels.csv"
 )
 
 if not metadata_path.exists():
-    raise FileNotFoundError(f"Kh?ng t?m th?y metadata: {metadata_path}")
+    raise FileNotFoundError(f"Không tìm thấy metadata: {metadata_path}")
 
 df = pd.read_csv(metadata_path)
 
-print("Metadata ?ang d?ng:", metadata_path)
+print("Metadata đang dùng:", metadata_path)
 print("Shape:", df.shape)
 print("Columns:")
 print(list(df.columns))
@@ -116,22 +115,22 @@ df.head()
 
 
 # %% [markdown]
-# ## 7. Ki?m tra c?c c?t c?n d?ng
+# ## 7. Kiểm tra các cột cần dùng
 #
-# V? ta ?? bi?t c?u tr?c `labels.csv`, code d?ng th?ng 3 c?t:
+# Vì ta đã biết cấu trúc `labels.csv`, code dùng thẳng 3 cột:
 #
-# - `image_name`: t?n file ?nh
-# - `text_ocr`: text/OCR ??a v?o BERT
-# - `overall_sentiment`: nh?n sentiment
+# - `image_name`: tên file ảnh
+# - `text_ocr`: text/OCR đưa vào BERT
+# - `overall_sentiment`: nhãn sentiment
 
 # %%
 required_columns = ["image_name", "text_ocr", "overall_sentiment"]
 
 for col in required_columns:
     if col not in df.columns:
-        raise ValueError(f"Kh?ng t?m th?y c?t b?t bu?c: {col}")
+        raise ValueError(f"Không tìm thấy cột bắt buộc: {col}")
 
-print("C?c c?t c?n d?ng ??u t?n t?i:", required_columns)
+print("Các cột cần dùng đều tồn tại:", required_columns)
 
 # %% [markdown]
 # ## 8. Tìm đường dẫn ảnh thật
@@ -814,7 +813,7 @@ predict_one_sample(
 #
 # ### Dùng BERT chuẩn thay BERT nano/tiny
 #
-# Sửa ? ph?n tham s? ??u notebook:
+# S?a tr?c ti?p tham s? trong d?ng kh?i t?o model:
 #
 # ```python
 # text_model_name="bert-base-uncased"
@@ -822,7 +821,7 @@ predict_one_sample(
 #
 # ### Dùng DistilBERT thay BERT nano/tiny
 #
-# Sửa ? ph?n tham s? ??u notebook:
+# S?a tr?c ti?p tham s? trong d?ng kh?i t?o model:
 #
 # ```python
 # text_model_name="distilbert-base-uncased"
