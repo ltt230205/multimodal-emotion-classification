@@ -40,17 +40,17 @@ negative / neutral / positive
 Kiến trúc tổng quát:
 
 ```text
-Text  -> DistilBERT/BERT -> text feature  \
-                                           concat -> classifier -> sentiment
-Image -> ResNet18        -> image feature /
+Text  -> BERT nano/tiny -> text tokens   \
+                                          cross-attention -> classifier -> sentiment
+Image -> ResNet18       -> image tokens  /
 ```
 
 Nói đơn giản:
 
 - Text được xử lý bằng model ngôn ngữ.
 - Image được xử lý bằng model ảnh.
-- Hai đặc trưng được nối lại.
-- Classifier học từ vector đã nối để dự đoán nhãn.
+- Text tokens dùng cross-attention để chú ý vào các vùng ảnh quan trọng.
+- Classifier học từ vector đã fusion để dự đoán nhãn.
 
 ## 2. Dataset cần Add trên Kaggle
 
@@ -190,7 +190,7 @@ Phần này chứa các tham số chính:
 ```python
 class CFG:
     DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
-    TEXT_MODEL = "distilbert-base-uncased"
+    TEXT_MODEL = "prajjwal1/bert-tiny"
     max_len = 96
     image_size = 224
     batch_size = 16
@@ -203,7 +203,7 @@ Bạn thường chỉnh các tham số này:
 | Tham số | Ý nghĩa | Khi nào chỉnh |
 |---|---|---|
 | `DATA_ROOT` | đường dẫn dataset Kaggle | khi Kaggle đặt folder khác |
-| `TEXT_MODEL` | model xử lý text | muốn dùng BERT chuẩn |
+| `TEXT_MODEL` | model xử lý text | muốn dùng BERT chuẩn hoặc DistilBERT |
 | `batch_size` | số mẫu mỗi batch | lỗi CUDA memory thì giảm |
 | `epochs` | số vòng train | muốn train lâu hơn |
 | `lr` | learning rate | model học quá chậm/quá bất ổn |
@@ -309,10 +309,12 @@ self.text_encoder = AutoModel.from_pretrained(text_model_name)
 Mặc định:
 
 ```python
-distilbert-base-uncased
+prajjwal1/bert-tiny
 ```
 
-Text branch biến một câu thành vector đặc trưng.
+Đây là một BERT rất nhỏ. Trong bài báo cáo, bạn có thể gọi là **BERT tiny/nano-like**. Nó nhẹ hơn `bert-base-uncased`, phù hợp để chạy nhanh trên Kaggle.
+
+Text branch biến một câu thành chuỗi token đặc trưng.
 
 Trong `forward`:
 
@@ -321,10 +323,16 @@ text_output = self.text_encoder(
     input_ids=input_ids,
     attention_mask=attention_mask,
 )
-text_feature = text_output.last_hidden_state[:, 0, :]
+text_tokens = text_output.last_hidden_state
 ```
 
-`text_feature` là vector đại diện cho nội dung text.
+`text_tokens` có dạng:
+
+```text
+batch_size x max_len x hidden_size
+```
+
+Nghĩa là mỗi token trong câu có một vector riêng.
 
 ### 5.7. Image branch
 
@@ -332,47 +340,79 @@ Trong model:
 
 ```python
 resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-resnet.fc = nn.Identity()
-self.image_encoder = resnet
+self.image_encoder = nn.Sequential(*list(resnet.children())[:-2])
 ```
 
 ResNet18 pretrained dùng để trích xuất đặc trưng ảnh.
 
-Dòng:
-
-```python
-resnet.fc = nn.Identity()
-```
-
-có nghĩa là bỏ classifier ImageNet gốc, chỉ giữ phần feature extractor.
-
-### 5.8. Fusion
-
-Text feature và image feature được đưa về 256 chiều:
-
-```python
-text_feature = self.text_projection(text_feature)
-image_feature = self.image_projection(image_feature)
-```
-
-Sau đó nối lại:
-
-```python
-fused_feature = torch.cat([text_feature, image_feature], dim=1)
-```
-
-Nếu:
+Thay vì lấy một vector ảnh duy nhất, code bỏ phần cuối của ResNet để giữ lại feature map:
 
 ```text
-text_feature  = 256 chiều
-image_feature = 256 chiều
+batch_size x 512 x 7 x 7
 ```
 
-thì:
+Sau đó feature map được đổi thành chuỗi image tokens:
 
 ```text
-fused_feature = 512 chiều
+batch_size x 49 x 512
 ```
+
+Vì `7 x 7 = 49`, ta có 49 vùng ảnh. Mỗi vùng ảnh là một image token.
+
+### 5.8. Cross-attention fusion
+
+Code này dùng kỹ thuật:
+
+```text
+Cross-Attention Fusion
+```
+
+Không phải concat fusion đơn thuần.
+
+Trước tiên, text tokens và image tokens được đưa về cùng kích thước 256:
+
+```python
+text_tokens = self.text_projection(text_tokens)
+image_tokens = self.image_projection(image_tokens)
+```
+
+Sau đó dùng cross-attention:
+
+```python
+attended_text_tokens, attention_weights = self.cross_attention(
+    query=text_tokens,
+    key=image_tokens,
+    value=image_tokens,
+)
+```
+
+Ý nghĩa:
+
+```text
+Query = text tokens
+Key   = image tokens
+Value = image tokens
+```
+
+Nói dễ hiểu: mỗi token trong text sẽ học cách chú ý tới các vùng ảnh liên quan.
+
+Ví dụ nếu text có từ mang cảm xúc mạnh, cross-attention có thể học xem vùng ảnh nào hỗ trợ cho cảm xúc đó.
+
+Sau cross-attention, code lấy 3 loại đặc trưng:
+
+```text
+text_cls      : đặc trưng text gốc
+attended_cls  : đặc trưng text sau khi attend vào image
+image_global  : đặc trưng ảnh tổng quát
+```
+
+Rồi nối 3 vector này lại:
+
+```python
+fused_feature = torch.cat([text_cls, attended_cls, image_global], dim=1)
+```
+
+Đây là bước fusion cuối cùng sau cross-attention.
 
 ### 5.9. Classifier
 
@@ -380,12 +420,13 @@ Classifier nhận vector fusion và dự đoán 3 lớp:
 
 ```python
 self.classifier = nn.Sequential(
+    nn.Linear(256 * 3, 256),
     nn.ReLU(),
     nn.Dropout(0.3),
-    nn.Linear(512, 256),
+    nn.Linear(256, 128),
     nn.ReLU(),
     nn.Dropout(0.3),
-    nn.Linear(256, num_classes),
+    nn.Linear(128, num_classes),
 )
 ```
 
@@ -481,7 +522,15 @@ Sửa:
 TEXT_MODEL = "bert-base-uncased"
 ```
 
-DistilBERT nhẹ hơn, BERT-base có thể mạnh hơn nhưng tốn GPU hơn.
+`prajjwal1/bert-tiny` nhẹ hơn, `bert-base-uncased` có thể mạnh hơn nhưng tốn GPU hơn.
+
+### Dùng DistilBERT
+
+Sửa:
+
+```python
+TEXT_MODEL = "distilbert-base-uncased"
+```
 
 ### Dùng ResNet50
 
@@ -489,19 +538,14 @@ Trong model, đổi:
 
 ```python
 resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+image_feature_size = 512
 ```
 
 thành:
 
 ```python
 resnet = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
-```
-
-Các dòng sau vẫn giữ nguyên:
-
-```python
-image_feature_size = resnet.fc.in_features
-resnet.fc = nn.Identity()
+image_feature_size = 2048
 ```
 
 ### Train lâu hơn
@@ -533,12 +577,13 @@ Bạn có thể dùng đoạn này:
 ```text
 Trong bài này, em sử dụng Memotion Dataset 7k cho bài toán phân loại sentiment
 đa phương thức. Mỗi mẫu gồm ảnh meme, nội dung text/OCR và nhãn sentiment. Mô
-hình được xây dựng với hai nhánh xử lý độc lập. Nhánh văn bản sử dụng
-DistilBERT/BERT để trích xuất đặc trưng ngữ nghĩa từ text. Nhánh hình ảnh sử
-dụng ResNet18 pretrained trên ImageNet, bỏ lớp phân loại cuối để lấy đặc trưng
-ảnh. Hai vector đặc trưng được chiếu về cùng kích thước, sau đó nối lại bằng
-concatenation fusion. Vector fusion được đưa qua một MLP classifier để phân loại
-thành ba lớp negative, neutral và positive.
+hình được xây dựng với hai nhánh xử lý độc lập. Nhánh văn bản sử dụng một mô
+hình BERT rất nhỏ (`prajjwal1/bert-tiny`) để trích xuất chuỗi đặc trưng token
+từ text. Nhánh hình ảnh sử dụng ResNet18 pretrained trên ImageNet và lấy feature
+map trước các lớp cuối để tạo các image tokens. Hai modality được kết hợp bằng
+cross-attention fusion, trong đó text tokens đóng vai trò query, còn image tokens
+đóng vai trò key và value. Vector sau fusion được đưa qua MLP classifier để phân
+loại thành ba lớp negative, neutral và positive.
 ```
 
 ## 10. Tóm tắt ngắn
@@ -547,9 +592,9 @@ Thư mục này là bản đơn giản, dễ hiểu:
 
 ```text
 Dataset: Memotion Dataset 7k
-Text model: DistilBERT
+Text model: BERT tiny/nano-like (`prajjwal1/bert-tiny`)
 Image model: ResNet18
-Fusion: concat
+Fusion: cross-attention
 Classifier: MLP
 Output: negative / neutral / positive
 ```

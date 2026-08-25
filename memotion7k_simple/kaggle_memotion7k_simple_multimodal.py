@@ -10,9 +10,9 @@
 # Ý tưởng mô hình:
 #
 # ```text
-# Text  -> DistilBERT/BERT -> text feature  \
-#                                           concat -> classifier -> sentiment
-# Image -> ResNet          -> image feature /
+# Text  -> BERT nano/tiny -> text tokens   \
+#                                            cross-attention -> classifier -> sentiment
+# Image -> ResNet18       -> image tokens  /
 # ```
 #
 # Mục tiêu của file này là dễ đọc, dễ hiểu, dễ sửa khi chạy trên Kaggle.
@@ -67,9 +67,10 @@ class CFG:
     # Nếu Kaggle của bạn để dataset trong /kaggle/input/datasets/..., hãy sửa lại dòng này.
     DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
 
-    # Model text. Dùng DistilBERT để nhẹ hơn BERT-base.
+    # Model text rất nhỏ. "prajjwal1/bert-tiny" là một BERT nhỏ, nhẹ,
+    # phù hợp khi bạn muốn gọi là BERT nano/tiny trong bài demo.
     # Nếu muốn dùng BERT chuẩn, đổi thành: "bert-base-uncased"
-    TEXT_MODEL = "distilbert-base-uncased"
+    TEXT_MODEL = "prajjwal1/bert-tiny"
 
     max_len = 96
     image_size = 224
@@ -538,16 +539,19 @@ print("Số batch validation:", len(val_loader))
 
 
 # %% [markdown]
-# ## 17. Model đơn giản: Text branch + Image branch + Fusion
+# ## 17. Model: Text branch + Image branch + Cross-Attention Fusion
 #
 # Model gồm:
 #
-# - `text_encoder`: DistilBERT/BERT
+# - `text_encoder`: BERT nano/tiny
 # - `image_encoder`: ResNet18 pretrained
-# - `classifier`: phân loại sau khi concat feature
+# - `cross_attention`: cho text tokens attend vào image tokens
+# - `classifier`: phân loại sau cross-attention fusion
 #
-# Dùng ResNet18 thay vì ResNet50 để code chạy nhẹ và dễ demo hơn.
-# Nếu muốn mạnh hơn, có thể đổi sang ResNet50.
+# Khác bản concat cũ:
+#
+# - Concat fusion chỉ nối `text_feature` và `image_feature`.
+# - Cross-attention fusion cho đặc trưng text học cách chú ý tới vùng ảnh liên quan.
 
 # %%
 class SimpleMultimodalModel(nn.Module):
@@ -559,28 +563,50 @@ class SimpleMultimodalModel(nn.Module):
         text_feature_size = self.text_encoder.config.hidden_size
 
         # Branch 2: Image encoder.
-        # Dùng ResNet18 pretrained để nhẹ hơn ResNet50.
+        # Dùng ResNet18 pretrained để nhẹ và dễ chạy trên Kaggle.
         resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-        image_feature_size = resnet.fc.in_features
 
-        # Bỏ classifier gốc của ResNet.
-        # Sau dòng này, ResNet chỉ trả về feature ảnh.
-        resnet.fc = nn.Identity()
-        self.image_encoder = resnet
+        # Bỏ avgpool và fc cuối để giữ feature map 7x7.
+        # Nếu input image là 224x224, output thường có shape:
+        # batch_size x 512 x 7 x 7
+        self.image_encoder = nn.Sequential(*list(resnet.children())[:-2])
+        image_feature_size = 512
 
-        # Đưa text feature và image feature về cùng kích thước 256.
+        # Đưa text token và image token về cùng kích thước để attention được.
+        # MultiheadAttention yêu cầu query/key/value có cùng embed_dim.
+        self.fusion_dim = 256
         self.text_projection = nn.Linear(text_feature_size, 256)
         self.image_projection = nn.Linear(image_feature_size, 256)
 
-        # Classifier sau fusion.
-        # Sau concat: 256 text + 256 image = 512.
+        # Cross-attention fusion.
+        # Query  : text tokens
+        # Key    : image tokens
+        # Value  : image tokens
+        #
+        # Nghĩa là text sẽ học cách "nhìn" vào các vùng ảnh liên quan.
+        self.cross_attention = nn.MultiheadAttention(
+            embed_dim=self.fusion_dim,
+            num_heads=4,
+            dropout=0.1,
+            batch_first=True,
+        )
+        self.attention_norm = nn.LayerNorm(self.fusion_dim)
+
+        # Classifier sau cross-attention fusion.
+        # Ta ghép 3 vector:
+        # - text_cls: đặc trưng text gốc
+        # - attended_cls: text sau khi attend vào ảnh
+        # - image_global: đặc trưng ảnh trung bình
+        #
+        # Tổng kích thước: 256 * 3 = 768.
         self.classifier = nn.Sequential(
+            nn.Linear(256 * 3, 256),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(512, 256),
+            nn.Linear(256, 128),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(256, num_classes),
+            nn.Linear(128, num_classes),
         )
 
     def forward(self, input_ids, attention_mask, image):
@@ -590,18 +616,45 @@ class SimpleMultimodalModel(nn.Module):
             attention_mask=attention_mask,
         )
 
-        # Lấy vector của token đầu tiên làm đại diện cho cả câu.
-        text_feature = text_output.last_hidden_state[:, 0, :]
+        # Lấy toàn bộ token text, không chỉ lấy CLS.
+        # Shape: batch_size x max_len x text_hidden
+        text_tokens = text_output.last_hidden_state
 
         # Image branch.
-        image_feature = self.image_encoder(image)
+        # Shape: batch_size x 512 x 7 x 7
+        image_feature_map = self.image_encoder(image)
+
+        # Đổi feature map thành chuỗi image tokens.
+        # batch_size x 512 x 7 x 7 -> batch_size x 49 x 512
+        batch_size, channels, height, width = image_feature_map.shape
+        image_tokens = image_feature_map.view(batch_size, channels, height * width)
+        image_tokens = image_tokens.permute(0, 2, 1)
 
         # Projection.
-        text_feature = self.text_projection(text_feature)
-        image_feature = self.image_projection(image_feature)
+        text_tokens = self.text_projection(text_tokens)
+        image_tokens = self.image_projection(image_tokens)
 
-        # Fusion bằng concat.
-        fused_feature = torch.cat([text_feature, image_feature], dim=1)
+        # Cross-attention fusion.
+        # Text tokens đóng vai trò Query.
+        # Image tokens đóng vai trò Key và Value.
+        attended_text_tokens, attention_weights = self.cross_attention(
+            query=text_tokens,
+            key=image_tokens,
+            value=image_tokens,
+        )
+
+        # Residual connection + LayerNorm giúp training ổn định hơn.
+        attended_text_tokens = self.attention_norm(text_tokens + attended_text_tokens)
+
+        # Lấy token đầu tiên làm đại diện.
+        text_cls = text_tokens[:, 0, :]
+        attended_cls = attended_text_tokens[:, 0, :]
+
+        # Lấy trung bình các image tokens làm đặc trưng ảnh tổng quát.
+        image_global = image_tokens.mean(dim=1)
+
+        # Fusion cuối cùng sau cross-attention.
+        fused_feature = torch.cat([text_cls, attended_cls, image_global], dim=1)
 
         # Classifier.
         logits = self.classifier(fused_feature)
@@ -843,7 +896,7 @@ predict_one_sample(sample["text"], sample["image_path"])
 # %% [markdown]
 # ## 24. Nếu muốn chỉnh model
 #
-# ### Dùng BERT chuẩn thay DistilBERT
+# ### Dùng BERT chuẩn thay BERT nano/tiny
 #
 # Sửa trong `CFG`:
 #
@@ -851,21 +904,32 @@ predict_one_sample(sample["text"], sample["image_path"])
 # TEXT_MODEL = "bert-base-uncased"
 # ```
 #
+# ### Dùng DistilBERT thay BERT nano/tiny
+#
+# Sửa trong `CFG`:
+#
+# ```python
+# TEXT_MODEL = "distilbert-base-uncased"
+# ```
+#
 # ### Dùng ResNet50 thay ResNet18
+#
+# Nếu muốn dùng ResNet50, phần image encoder cần sửa cẩn thận hơn vì số channel
+# output của ResNet50 là 2048 thay vì 512.
 #
 # Trong class `SimpleMultimodalModel`, đổi:
 #
 # ```python
 # resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
+# image_feature_size = 512
 # ```
 #
 # thành:
 #
 # ```python
 # resnet = models.resnet50(weights=models.ResNet50_Weights.IMAGENET1K_V2)
+# image_feature_size = 2048
 # ```
-#
-# Các dòng còn lại giữ nguyên.
 #
 # ### Nếu bị CUDA out of memory
 #
@@ -911,10 +975,10 @@ predict_one_sample(sample["text"], sample["image_path"])
 # Kiến trúc:
 #
 # ```text
-# Text  -> DistilBERT -> text feature
-# Image -> ResNet18   -> image feature
-# text feature + image feature -> concat fusion
-# concat feature -> classifier -> negative/neutral/positive
+# Text  -> BERT nano/tiny -> text tokens
+# Image -> ResNet18       -> image tokens
+# text tokens attend image tokens -> cross-attention fusion
+# fused feature -> classifier -> negative/neutral/positive
 # ```
 #
 # Đây là phiên bản đơn giản hơn bản 2 dataset, phù hợp để học, giải thích và demo trên Kaggle.
