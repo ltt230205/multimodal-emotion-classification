@@ -1,23 +1,4 @@
 # %% [markdown]
-# # Simple Multimodal Sentiment Classification on Memotion Dataset 7k
-#
-# File này là một bài code Kaggle đơn giản, chỉ dùng **1 dataset**:
-#
-# ```text
-# Memotion Dataset 7k
-# ```
-#
-# Ý tưởng mô hình:
-#
-# ```text
-# Text  -> BERT nano/tiny -> text tokens   \
-#                                            cross-attention -> classifier -> sentiment
-# Image -> ResNet18       -> image tokens  /
-# ```
-#
-# Mục tiêu của file này là dễ đọc, dễ hiểu, dễ sửa khi chạy trên Kaggle.
-
-# %% [markdown]
 # ## 1. Import thư viện
 
 # %%
@@ -48,42 +29,6 @@ ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 # %% [markdown]
-# ## 2. Config đơn giản
-#
-# Nếu Kaggle báo không thấy dataset, hãy chạy:
-#
-# ```python
-# import os
-# print(os.listdir("/kaggle/input"))
-# ```
-#
-# rồi sửa lại `DATA_ROOT` cho đúng.
-
-# %%
-SEED = 42
-
-# ???ng d?n m?c ??nh khi Add Input dataset tr?n Kaggle.
-# N?u Kaggle c?a b?n ?? dataset trong /kaggle/input/datasets/..., h?y s?a l?i d?ng n?y.
-DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
-
-# Model text r?t nh?. "prajjwal1/bert-tiny" l? m?t BERT nh?, nh?,
-# ph? h?p khi b?n mu?n g?i l? BERT nano/tiny trong b?i demo.
-# N?u mu?n d?ng BERT chu?n, ??i th?nh: "bert-base-uncased"
-TEXT_MODEL = "prajjwal1/bert-tiny"
-
-MAX_LEN = 96
-IMAGE_SIZE = 224
-BATCH_SIZE = 16
-EPOCHS = 3
-LEARNING_RATE = 2e-5
-NUM_WORKERS = 2
-
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
-print("Device:", DEVICE)
-
-
-# %% [markdown]
 # ## 3. Cố định seed
 #
 # Cố định seed giúp kết quả ít thay đổi giữa các lần chạy.
@@ -97,7 +42,7 @@ def seed_everything(seed):
     torch.cuda.manual_seed_all(seed)
 
 
-seed_everything(SEED)
+seed_everything(42)
 
 
 # %% [markdown]
@@ -110,8 +55,8 @@ if Path("/kaggle/input").exists():
 else:
     print("Không chạy trên Kaggle hoặc chưa có /kaggle/input")
 
-print("\nDATA_ROOT hiện tại:", DATA_ROOT)
-print("DATA_ROOT tồn tại không?", DATA_ROOT.exists())
+print("\nDataset path:", Path("/kaggle/input/memotion-dataset-7k"))
+print("Dataset path exists:", Path("/kaggle/input/memotion-dataset-7k").exists())
 
 
 # %% [markdown]
@@ -134,14 +79,14 @@ def find_table_files(root):
     return table_files
 
 
-table_files = find_table_files(DATA_ROOT)
+table_files = find_table_files(Path("/kaggle/input/memotion-dataset-7k"))
 
 print("Các file metadata tìm thấy:")
 for i, path in enumerate(table_files):
     print(i, "->", path)
 
 if len(table_files) == 0:
-    raise FileNotFoundError("Không tìm thấy file metadata. Hãy kiểm tra lại DATA_ROOT.")
+    raise FileNotFoundError("Không tìm thấy file metadata. Hãy kiểm tra lại dataset path.")
 
 
 # %% [markdown]
@@ -243,7 +188,7 @@ if image_col is None or text_col is None or label_col is None:
 image_extensions = [".jpg", ".jpeg", ".png", ".bmp", ".webp"]
 
 all_image_paths = []
-for path in DATA_ROOT.rglob("*"):
+for path in Path("/kaggle/input/memotion-dataset-7k").rglob("*"):
     if path.suffix.lower() in image_extensions:
         all_image_paths.append(path)
 
@@ -397,7 +342,7 @@ data.head()
 train_df, val_df = train_test_split(
     data,
     test_size=0.2,
-    random_state=SEED,
+    random_state=42,
     stratify=data["label"],
 )
 
@@ -419,11 +364,11 @@ print(val_df["label_name"].value_counts())
 # Image được resize 224x224 và normalize theo ImageNet để hợp với ResNet pretrained.
 
 # %%
-tokenizer = AutoTokenizer.from_pretrained(TEXT_MODEL)
+tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
 
 train_image_transform = transforms.Compose(
     [
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.Resize((224, 224)),
         transforms.RandomHorizontalFlip(p=0.3),
         transforms.ToTensor(),
         transforms.Normalize(
@@ -435,7 +380,7 @@ train_image_transform = transforms.Compose(
 
 val_image_transform = transforms.Compose(
     [
-        transforms.Resize((IMAGE_SIZE, IMAGE_SIZE)),
+        transforms.Resize((224, 224)),
         transforms.ToTensor(),
         transforms.Normalize(
             mean=[0.485, 0.456, 0.406],
@@ -509,30 +454,30 @@ train_dataset = MemotionDataset(
     dataframe=train_df,
     tokenizer=tokenizer,
     image_transform=train_image_transform,
-    max_len=MAX_LEN,
-    image_size=IMAGE_SIZE,
+    max_len=96,
+    image_size=224,
 )
 
 val_dataset = MemotionDataset(
     dataframe=val_df,
     tokenizer=tokenizer,
     image_transform=val_image_transform,
-    max_len=MAX_LEN,
-    image_size=IMAGE_SIZE,
+    max_len=96,
+    image_size=224,
 )
 
 train_loader = DataLoader(
     train_dataset,
-    batch_size=BATCH_SIZE,
+    batch_size=16,
     shuffle=True,
-    num_workers=NUM_WORKERS,
+    num_workers=2,
 )
 
 val_loader = DataLoader(
     val_dataset,
-    batch_size=BATCH_SIZE,
+    batch_size=16,
     shuffle=False,
-    num_workers=NUM_WORKERS,
+    num_workers=2,
 )
 
 print("Số batch train:", len(train_loader))
@@ -663,11 +608,11 @@ class SimpleMultimodalModel(nn.Module):
 
 
 model = SimpleMultimodalModel(
-    text_model_name=TEXT_MODEL,
+    text_model_name="prajjwal1/bert-tiny",
     num_classes=3,
 )
 
-model = model.to(DEVICE)
+model = model.to(torch.device("cuda" if torch.cuda.is_available() else "cpu"))
 
 print(model)
 
@@ -680,7 +625,7 @@ criterion = nn.CrossEntropyLoss()
 
 optimizer = torch.optim.AdamW(
     model.parameters(),
-    lr=LEARNING_RATE,
+    lr=2e-5,
 )
 
 
@@ -771,23 +716,23 @@ def evaluate(model, dataloader, criterion, device):
 best_val_f1 = 0
 history = []
 
-for epoch in range(EPOCHS):
+for epoch in range(3):
     print("=" * 60)
-    print(f"Epoch {epoch + 1}/{EPOCHS}")
+    print(f"Epoch {epoch + 1}/3")
 
     train_loss, train_acc, train_f1 = train_one_epoch(
         model=model,
         dataloader=train_loader,
         criterion=criterion,
         optimizer=optimizer,
-        device=DEVICE,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 
     val_loss, val_acc, val_f1, val_preds, val_labels = evaluate(
         model=model,
         dataloader=val_loader,
         criterion=criterion,
-        device=DEVICE,
+        device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
     )
 
     print(f"Train loss: {train_loss:.4f} | Train acc: {train_acc:.4f} | Train F1: {train_f1:.4f}")
@@ -819,13 +764,13 @@ history_df
 # ## 22. Kết quả cuối cùng
 
 # %%
-model.load_state_dict(torch.load("best_simple_memotion_model.pt", map_location=DEVICE))
+model.load_state_dict(torch.load("best_simple_memotion_model.pt", map_location=torch.device("cuda" if torch.cuda.is_available() else "cpu")))
 
 val_loss, val_acc, val_f1, val_preds, val_labels = evaluate(
     model=model,
     dataloader=val_loader,
     criterion=criterion,
-    device=DEVICE,
+    device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 )
 
 print("Best validation accuracy:", val_acc)
@@ -894,9 +839,9 @@ print()
 predict_one_sample(
     text=sample["text"],
     image_path=sample["image_path"],
-    max_len=MAX_LEN,
-    image_size=IMAGE_SIZE,
-    device=DEVICE,
+    max_len=96,
+    image_size=224,
+    device=torch.device("cuda" if torch.cuda.is_available() else "cpu"),
 )
 
 
@@ -908,7 +853,7 @@ predict_one_sample(
 # Sửa ? ph?n tham s? ??u notebook:
 #
 # ```python
-# TEXT_MODEL = "bert-base-uncased"
+# text_model_name="bert-base-uncased"
 # ```
 #
 # ### Dùng DistilBERT thay BERT nano/tiny
@@ -916,7 +861,7 @@ predict_one_sample(
 # Sửa ? ph?n tham s? ??u notebook:
 #
 # ```python
-# TEXT_MODEL = "distilbert-base-uncased"
+# text_model_name="distilbert-base-uncased"
 # ```
 #
 # ### Dùng ResNet50 thay ResNet18
@@ -943,13 +888,13 @@ predict_one_sample(
 # Giảm:
 #
 # ```python
-# BATCH_SIZE = 8
+# batch_size=8
 # ```
 #
 # hoặc:
 #
 # ```python
-# BATCH_SIZE = 4
+# batch_size=4
 # ```
 #
 # ### Nếu DataLoader bị lỗi
@@ -957,7 +902,7 @@ predict_one_sample(
 # Sửa:
 #
 # ```python
-# NUM_WORKERS = 0
+# num_workers=0
 # ```
 #
 # ### Nếu muốn train lâu hơn
@@ -965,13 +910,13 @@ predict_one_sample(
 # Tăng:
 #
 # ```python
-# EPOCHS = 5
+# range(5)
 # ```
 #
 # hoặc:
 #
 # ```python
-# EPOCHS = 8
+# range(8)
 # ```
 
 # %% [markdown]

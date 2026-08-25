@@ -142,12 +142,12 @@ chạy tiếp:
 print(os.listdir("/kaggle/input/datasets/williamscott701"))
 ```
 
-Sau đó sửa `DATA_ROOT` trong code cho đúng.
+Sau ?? s?a tr?c ti?p c?c d?ng c? `Path("/kaggle/input/memotion-dataset-7k")` cho ??ng.
 
 Ví dụ:
 
 ```python
-DATA_ROOT = Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k")
+Path("/kaggle/input/datasets/williamscott701/memotion-dataset-7k")
 ```
 
 ## 4. Cấu trúc code
@@ -156,7 +156,7 @@ Code được chia thành nhiều phần rõ ràng:
 
 ```text
 1. Import thư viện
-2. Config
+2. Ki?m tra ???ng d?n dataset
 3. Cố định seed
 4. Kiểm tra dataset
 5. Tìm metadata
@@ -183,32 +183,21 @@ Code được chia thành nhiều phần rõ ràng:
 
 ## 5. Giải thích các phần quan trọng
 
-### 5.1. Config
+### 5.1. Tham s? ???c fix tr?c ti?p trong code
 
-Phần này chứa các tham số chính. Bản notebook mới không dùng `class CFG`, mà khai báo biến trực tiếp để dễ nhìn và dễ sửa:
+B?n notebook n?y kh?ng c? cell khai b?o tham s? ri?ng; c?c gi? tr? ???c fix tr?c ti?p t?i n?i s? d?ng.
+
+C?c gi? tr? ???c vi?t th?ng t?i n?i s? d?ng ?? code d? theo d?i h?n. V? d?:
 
 ```python
-DATA_ROOT = Path("/kaggle/input/memotion-dataset-7k")
-TEXT_MODEL = "prajjwal1/bert-tiny"
-MAX_LEN = 96
-IMAGE_SIZE = 224
-BATCH_SIZE = 16
-EPOCHS = 3
-LEARNING_RATE = 2e-5
-NUM_WORKERS = 2
-DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+table_files = find_table_files(Path("/kaggle/input/memotion-dataset-7k"))
+tokenizer = AutoTokenizer.from_pretrained("prajjwal1/bert-tiny")
+transforms.Resize((224, 224))
+DataLoader(train_dataset, batch_size=16, shuffle=True, num_workers=2)
+for epoch in range(3):
 ```
 
-Bạn thường chỉnh các tham số này:
-
-| Tham số | Ý nghĩa | Khi nào chỉnh |
-|---|---|---|
-| `DATA_ROOT` | đường dẫn dataset Kaggle | khi Kaggle đặt folder khác |
-| `TEXT_MODEL` | model xử lý text | muốn dùng BERT chuẩn hoặc DistilBERT |
-| `BATCH_SIZE` | số mẫu mỗi batch | lỗi CUDA memory thì giảm |
-| `EPOCHS` | số vòng train | muốn train lâu hơn |
-| `LEARNING_RATE` | learning rate | model học quá chậm/quá bất ổn |
-| `NUM_WORKERS` | số worker load data | lỗi DataLoader thì đặt 0 |
+N?u mu?n ch?nh tham s?, b?n s?a tr?c ti?p ? d?ng ?ang d?ng gi? tr? ??.
 
 ### 5.2. Đọc metadata
 
@@ -471,7 +460,7 @@ print(os.listdir("/kaggle/input"))
 rồi sửa:
 
 ```python
-DATA_ROOT = Path("duong_dan_dung")
+Path("duong_dan_dung")
 ```
 
 ### Lỗi CUDA out of memory
@@ -479,13 +468,13 @@ DATA_ROOT = Path("duong_dan_dung")
 Giảm batch size:
 
 ```python
-BATCH_SIZE = 8
+batch_size=8
 ```
 
 hoặc:
 
 ```python
-BATCH_SIZE = 4
+batch_size=4
 ```
 
 ### Lỗi DataLoader hoặc ảnh hỏng
@@ -493,7 +482,7 @@ BATCH_SIZE = 4
 Đổi:
 
 ```python
-NUM_WORKERS = 0
+num_workers=0
 ```
 
 Code đã có xử lý ảnh lỗi:
@@ -509,7 +498,7 @@ và fallback ảnh đen nếu ảnh không đọc được.
 Giảm:
 
 ```python
-EPOCHS = 2
+range(2)
 ```
 
 hoặc giữ ResNet18 thay vì đổi sang ResNet50.
@@ -521,7 +510,7 @@ hoặc giữ ResNet18 thay vì đổi sang ResNet50.
 Sửa:
 
 ```python
-TEXT_MODEL = "bert-base-uncased"
+text_model_name="bert-base-uncased"
 ```
 
 `prajjwal1/bert-tiny` nhẹ hơn, `bert-base-uncased` có thể mạnh hơn nhưng tốn GPU hơn.
@@ -531,7 +520,7 @@ TEXT_MODEL = "bert-base-uncased"
 Sửa:
 
 ```python
-TEXT_MODEL = "distilbert-base-uncased"
+text_model_name="distilbert-base-uncased"
 ```
 
 ### Dùng ResNet50
@@ -555,13 +544,13 @@ image_feature_size = 2048
 Sửa:
 
 ```python
-EPOCHS = 5
+range(5)
 ```
 
 hoặc:
 
 ```python
-EPOCHS = 8
+range(8)
 ```
 
 ### Tăng độ dài text
@@ -569,7 +558,7 @@ EPOCHS = 8
 Nếu text dài, sửa:
 
 ```python
-MAX_LEN = 128
+max_len=128
 ```
 
 ## 9. Đoạn mô tả cho báo cáo
