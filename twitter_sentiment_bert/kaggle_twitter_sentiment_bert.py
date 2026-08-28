@@ -142,8 +142,8 @@ df.head()
 #
 # Với dataset Twitter sentiment, các tên cột hay gặp là:
 #
-# - Text: `text`, `tweet`, `clean_text`, `Tweet_content`
-# - Label: `sentiment`, `category`, `label`, `Sentiment`
+# - Text: `text`, `tweet`, `clean_text`, `Tweet_content`, `Caption`
+# - Label: `sentiment`, `category`, `label`, `Sentiment`, `LABEL`
 #
 # Nếu cell này chọn sai, bạn sửa trực tiếp `text_column` và `label_column`.
 
@@ -166,12 +166,12 @@ def find_column(columns, candidates):
 
 text_column = find_column(
     df.columns,
-    ["text", "tweet", "clean_text", "tweet_content", "Tweet_content", "content", "sentence"],
+    ["Caption", "text", "tweet", "clean_text", "tweet_content", "Tweet_content", "content", "sentence"],
 )
 
 label_column = find_column(
     df.columns,
-    ["sentiment", "category", "label", "target", "class", "polarity"],
+    ["LABEL", "sentiment", "category", "label", "target", "class", "polarity"],
 )
 
 print("text_column :", text_column)
