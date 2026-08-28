@@ -8,7 +8,7 @@ from pathlib import Path
 
 import numpy as np
 import pandas as pd
-from PIL import Image
+from PIL import Image, ImageFile
 
 import torch
 import torch.nn as nn
@@ -22,6 +22,8 @@ from torchvision import models
 
 from transformers import AutoTokenizer, AutoModel
 
+
+ImageFile.LOAD_TRUNCATED_IMAGES = True
 
 
 
@@ -248,6 +250,40 @@ print("Sau khi bỏ mẫu thiếu ảnh/label:", len(data))
 print(data["label_name"].value_counts())
 data.head()
 
+# %% [markdown]
+# ## 11. Lọc ảnh lỗi trước khi train
+#
+# Một số ảnh trong Memotion 7k có thể bị hỏng hoặc bị cắt thiếu dữ liệu.
+# Nếu không lọc trước, DataLoader có thể dừng khi gặp lỗi:
+#
+# ```text
+# OSError: image file is truncated
+# ```
+#
+# Vì vậy ta kiểm tra từng file ảnh một lần trước khi train.
+
+# %%
+def is_valid_image(path):
+    try:
+        with Image.open(path) as img:
+            img.verify()
+
+        with Image.open(path) as img:
+            img.convert("RGB")
+
+        return True
+    except Exception:
+        return False
+
+
+before_filter = len(data)
+data = data[data["image_path"].apply(is_valid_image)].reset_index(drop=True)
+after_filter = len(data)
+
+print("Số ảnh lỗi đã bỏ:", before_filter - after_filter)
+print("Số mẫu cuối cùng dùng để train:", after_filter)
+print(data["label_name"].value_counts())
+data.head()
 
 # %% [markdown]
 # ## 12. Mã hóa label thành số
