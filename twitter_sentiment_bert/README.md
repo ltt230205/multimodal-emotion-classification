@@ -47,10 +47,10 @@ twitter-dataset-for-sentiment-analysis
 ```
 
 5. Chọn dataset của `dunyajasim`.
-6. Sau khi add xong, dataset thường nằm ở:
+6. Sau khi add xong, dataset của bạn đang nằm ở:
 
 ```text
-/kaggle/input/twitter-dataset-for-sentiment-analysis
+/kaggle/input/datasets/dunyajasim/twitter-dataset-for-sentiment-analysis
 ```
 
 ## Cách chạy
@@ -59,7 +59,7 @@ Chạy lần lượt từ trên xuống dưới:
 
 1. Import thư viện.
 2. Kiểm tra dataset.
-3. Đọc CSV.
+3. Đọc file dữ liệu `.xlsx` hoặc `.csv`.
 4. Chọn cột text và label.
 5. Làm sạch dữ liệu.
 6. Chia train/validation.

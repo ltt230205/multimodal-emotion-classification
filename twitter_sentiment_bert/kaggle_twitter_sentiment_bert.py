@@ -64,7 +64,7 @@ print("Device:", device)
 # Sau khi Add Input dataset trên Kaggle, dữ liệu thường nằm trong:
 #
 # ```text
-# /kaggle/input/twitter-dataset-for-sentiment-analysis
+# /kaggle/input/datasets/dunyajasim/twitter-dataset-for-sentiment-analysis
 # ```
 
 # %%
@@ -74,17 +74,22 @@ if Path("/kaggle/input").exists():
 else:
     print("Không chạy trên Kaggle hoặc chưa có /kaggle/input")
 
-data_root = Path("/kaggle/input/twitter-dataset-for-sentiment-analysis")
+data_root = Path("/kaggle/input/datasets/dunyajasim/twitter-dataset-for-sentiment-analysis")
 
 if not data_root.exists():
     print("\nKhông thấy path mặc định:", data_root)
-    print("Đang thử tìm folder có chữ twitter trong /kaggle/input...")
+    print("Đang thử các path thường gặp khác...")
 
-    possible_roots = []
+    possible_roots = [
+        Path("/kaggle/input/twitter-dataset-for-sentiment-analysis"),
+    ]
+
     if Path("/kaggle/input").exists():
-        for path in Path("/kaggle/input").iterdir():
+        for path in Path("/kaggle/input").rglob("*"):
             if path.is_dir() and "twitter" in path.name.lower():
                 possible_roots.append(path)
+
+    possible_roots = [path for path in possible_roots if path.exists()]
 
     if len(possible_roots) == 0:
         raise FileNotFoundError(
@@ -97,26 +102,34 @@ print("Dataset root đang dùng:", data_root)
 
 
 # %% [markdown]
-# ## 4. Đọc file CSV
+# ## 4. Đọc file dữ liệu
 #
-# Dataset có thể chứa một hoặc nhiều file CSV. Cell này in ra các file tìm thấy rồi chọn file CSV đầu tiên.
+# Dataset này có thể chứa file `.xlsx` thay vì `.csv`.
+# Cell này in ra các file bảng tìm thấy rồi chọn file đầu tiên.
 #
-# Nếu Kaggle của bạn có nhiều file và bạn muốn dùng file khác, chỉ cần sửa biến `csv_path`.
+# Nếu Kaggle của bạn có nhiều file và bạn muốn dùng file khác, chỉ cần sửa biến `data_path`.
 
 # %%
-csv_files = sorted(list(data_root.rglob("*.csv")))
+table_files = []
+for extension in ["*.csv", "*.xlsx", "*.xls"]:
+    table_files.extend(list(data_root.rglob(extension)))
 
-print("Các file CSV tìm thấy:")
-for i, path in enumerate(csv_files):
+table_files = sorted(table_files)
+
+print("Các file dữ liệu tìm thấy:")
+for i, path in enumerate(table_files):
     print(i, "->", path)
 
-if len(csv_files) == 0:
-    raise FileNotFoundError("Không tìm thấy file CSV trong dataset.")
+if len(table_files) == 0:
+    raise FileNotFoundError("Không tìm thấy file CSV/XLSX/XLS trong dataset.")
 
-csv_path = csv_files[0]
-print("\nCSV đang dùng:", csv_path)
+data_path = table_files[0]
+print("\nFile đang dùng:", data_path)
 
-df = pd.read_csv(csv_path)
+if data_path.suffix.lower() == ".csv":
+    df = pd.read_csv(data_path)
+else:
+    df = pd.read_excel(data_path)
 
 print("Shape:", df.shape)
 print("Columns:")
