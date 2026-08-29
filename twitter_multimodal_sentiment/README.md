@@ -64,9 +64,22 @@ rồi tìm ảnh có stem tương ứng:
 Notebook dùng cả text và image:
 
 ```text
-Caption -> BERT tiny -> text feature
-Image   -> ResNet18  -> image feature
-text feature + image feature -> classifier -> LABEL
+         Caption
+            |
+          BERT
+            |
+       text tokens
+            |
+            v
+     Cross Attention  <--- image region tokens <--- ResNet18 <--- Image
+            |
+       fused feature
+            |
+           MLP
+            |
+         Softmax
+            |
+negative / neutral / positive
 ```
 
 Text branch:
@@ -84,16 +97,32 @@ ResNet18 pretrained ImageNet
 Fusion đang dùng:
 
 ```text
-Concat fusion
+Cross-attention fusion
 ```
 
-Tức là nối vector đặc trưng text và vector đặc trưng ảnh lại:
+Thay vì nối vector bằng concat, notebook cho token text từ BERT chú ý vào các vùng ảnh từ ResNet18:
+
+```text
+BERT text tokens = query
+ResNet image region tokens = key, value
+```
+
+Trong code:
 
 ```python
-fused_feature = torch.cat([text_feature, image_feature], dim=1)
+fused_tokens, attention_weights = self.cross_attention(
+    query=text_tokens,
+    key=image_tokens,
+    value=image_tokens,
+)
 ```
 
-sau đó đưa qua classifier.
+Sau đó lấy token đầu tiên đã được fusion để đưa qua MLP classifier:
+
+```python
+cls_fused_feature = fused_tokens[:, 0, :]
+logits = self.classifier(cls_fused_feature)
+```
 
 ## Cách Add Input trên Kaggle
 

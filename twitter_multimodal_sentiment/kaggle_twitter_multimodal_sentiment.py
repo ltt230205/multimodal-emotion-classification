@@ -430,9 +430,31 @@ print("Số batch validation:", len(val_loader))
 #
 # - Text branch: BERT tiny trích xuất đặc trưng text.
 # - Image branch: ResNet18 trích xuất đặc trưng ảnh.
-# - Fusion classifier: nối hai đặc trưng lại rồi phân loại.
+# - Cross-attention fusion: text tokens học cách chú ý vào các vùng ảnh.
+# - MLP classifier: phân loại sau khi fusion.
 #
-# Kỹ thuật fusion trong notebook này là **concat fusion**.
+# Kỹ thuật fusion trong notebook này là **cross-attention fusion**.
+#
+# Luồng chính:
+#
+# ```text
+#          Caption
+#             |
+#           BERT
+#             |
+#        text tokens
+#             |
+#             v
+#      Cross Attention  <--- image region tokens <--- ResNet18 <--- Image
+#             |
+#        fused feature
+#             |
+#            MLP
+#             |
+#          Softmax
+#             |
+# negative / neutral / positive
+# ```
 
 # %%
 class MultimodalSentimentModel(nn.Module):
@@ -443,19 +465,24 @@ class MultimodalSentimentModel(nn.Module):
         text_feature_size = self.text_encoder.config.hidden_size
 
         resnet = models.resnet18(weights=models.ResNet18_Weights.IMAGENET1K_V1)
-        image_feature_size = resnet.fc.in_features
-        resnet.fc = nn.Identity()
-        self.image_encoder = resnet
+        self.image_encoder = nn.Sequential(*list(resnet.children())[:-2])
+        image_feature_size = 512
 
         self.text_projection = nn.Linear(text_feature_size, 128)
         self.image_projection = nn.Linear(image_feature_size, 128)
 
+        self.cross_attention = nn.MultiheadAttention(
+            embed_dim=128,
+            num_heads=4,
+            batch_first=True,
+        )
+
         self.classifier = nn.Sequential(
             nn.Dropout(0.3),
-            nn.Linear(256, 128),
+            nn.Linear(128, 64),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(128, 3),
+            nn.Linear(64, 3),
         )
 
     def forward(self, input_ids, attention_mask, image):
@@ -464,14 +491,21 @@ class MultimodalSentimentModel(nn.Module):
             attention_mask=attention_mask,
         )
 
-        text_cls = text_outputs.last_hidden_state[:, 0, :]
-        text_feature = self.text_projection(text_cls)
+        text_tokens = text_outputs.last_hidden_state
+        text_tokens = self.text_projection(text_tokens)
 
-        image_feature = self.image_encoder(image)
-        image_feature = self.image_projection(image_feature)
+        image_feature_map = self.image_encoder(image)
+        image_tokens = image_feature_map.flatten(2).transpose(1, 2)
+        image_tokens = self.image_projection(image_tokens)
 
-        fused_feature = torch.cat([text_feature, image_feature], dim=1)
-        logits = self.classifier(fused_feature)
+        fused_tokens, attention_weights = self.cross_attention(
+            query=text_tokens,
+            key=image_tokens,
+            value=image_tokens,
+        )
+
+        cls_fused_feature = fused_tokens[:, 0, :]
+        logits = self.classifier(cls_fused_feature)
 
         return logits
 
